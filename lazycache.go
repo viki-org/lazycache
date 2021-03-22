@@ -30,7 +30,7 @@ func New(fetcher Fetcher, ttl time.Duration, size int) *LazyCache {
 	}
 }
 
-func (cache *LazyCache) Get(id string) (interface{}, bool) {
+func (cache *LazyCache) Get(id string) (interface{}, bool, error) {
 	cache.lock.RLock()
 	item, exists := cache.items[id]
 	if exists == false {
@@ -43,7 +43,7 @@ func (cache *LazyCache) Get(id string) (interface{}, bool) {
 	if time.Now().After(expires) {
 		go cache.Fetch(id)
 	}
-	return object, object != nil
+	return object, object != nil, nil
 }
 
 func (cache *LazyCache) Set(id string, object interface{}) {
@@ -58,11 +58,11 @@ func (cache *LazyCache) Set(id string, object interface{}) {
 	}
 }
 
-func (cache *LazyCache) Fetch(id string) (interface{}, bool) {
+func (cache *LazyCache) Fetch(id string) (interface{}, bool, error) {
 	object, err := cache.fetcher(id)
 	if err != nil {
-		return nil, false
+		return nil, false, err
 	}
 	cache.Set(id, object)
-	return object, object != nil
+	return object, object != nil, nil
 }
