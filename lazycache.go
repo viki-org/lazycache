@@ -42,6 +42,18 @@ func NewGroup(groupFetcher GroupFetcher, ttl time.Duration, size int) *LazyCache
 	}
 }
 
+func (cache *LazyCache) SwapGroup(groupFetcher GroupFetcher) *LazyCache {
+	cache.groupFetcher = groupFetcher
+	cache.fetcher = nil
+	return cache
+}
+
+func (cache *LazyCache) SwapSingle(fetcher Fetcher) *LazyCache {
+	cache.fetcher = fetcher
+	cache.groupFetcher = nil
+	return cache
+}
+
 func (cache *LazyCache) Get(id string) (interface{}, bool) {
 	cache.lock.RLock()
 	item, exists := cache.items[id]
