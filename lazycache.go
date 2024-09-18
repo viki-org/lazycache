@@ -33,24 +33,18 @@ func New(fetcher Fetcher, ttl time.Duration, size int) *LazyCache {
 	}
 }
 
-func NewGroup(groupFetcher GroupFetcher, ttl time.Duration, size int) *LazyCache {
+func NewGroup(groupFetcher GroupFetcher, fetcher Fetcher, ttl time.Duration, size int) *LazyCache {
 	return &LazyCache{
 		ttl:          ttl,
-		fetcher:      nil,
+		fetcher:      fetcher,
 		groupFetcher: groupFetcher,
 		items:        make(map[string]*Item, size),
 	}
 }
 
-func (cache *LazyCache) SwapGroup(groupFetcher GroupFetcher) *LazyCache {
-	cache.groupFetcher = groupFetcher
-	cache.fetcher = nil
-	return cache
-}
-
-func (cache *LazyCache) SwapSingle(fetcher Fetcher) *LazyCache {
+func (cache *LazyCache) SwapCache(fetcher Fetcher, groupFetcher GroupFetcher) *LazyCache {
 	cache.fetcher = fetcher
-	cache.groupFetcher = nil
+	cache.groupFetcher = groupFetcher
 	return cache
 }
 
@@ -101,7 +95,10 @@ func (cache *LazyCache) Fetch(id string) (interface{}, bool) {
 func (cache *LazyCache) groupFetch(id string) (interface{}, bool) {
 	objects, err := cache.groupFetcher()
 	if err != nil || objects == nil {
-		return nil, false
+		if cache.fetcher == nil {
+			return nil, false
+		}
+		return cache.Fetch(id) // fallback to single fetch
 	}
 
 	var res interface{}
