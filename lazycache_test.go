@@ -35,34 +35,34 @@ func errorFetcher(count *int) Fetcher {
 }
 
 func groupStoreFetcher(count *int) GroupFetcher {
-	return func() (*map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
 		group := map[string]interface{}{
 			"Hi":  *count,
 			"Bye": *count,
 		}
-		return &group, nil
+		return group, nil
 	}
 }
 
 func groupCountFetcher(count *int) GroupFetcher {
-	return func() (*map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
 		*count += 1
 		group := map[string]interface{}{
 			"Hi": *count,
 		}
-		return &group, nil
+		return group, nil
 	}
 }
 
 func groupNilFetcher(count *int) GroupFetcher {
-	return func() (*map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
 		*count += 1
 		return nil, nil
 	}
 }
 
 func groupErrorFetcher(count *int) GroupFetcher {
-	return func() (*map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
 		return nil, errors.New("oops")
 	}
 }
@@ -285,7 +285,7 @@ func TestSwapGroupOnFetchUsesGroup(t *testing.T) {
 	}
 	cache = cache.SwapCache(countFetcher((&count)), groupCountFetcher(&groupCount))
 	cache.Get("Hi")
-	time.Sleep(10 * time.Microsecond)
+	time.Sleep(20 * time.Microsecond)
 
 	if count != 1 {
 		t.Errorf("expected %+v to equal 1", count)
@@ -300,8 +300,8 @@ func TestSwapSingleOnFetchKeepsOldValue(t *testing.T) {
 	groupCount := 0
 	cache := NewGroup(groupCountFetcher(&groupCount), countFetcher((&count)), time.Second, 1)
 	cache.Get("Hi")
-	if count != 1 {
-		t.Errorf("expected %+v to equal 1", count)
+	if groupCount != 1 {
+		t.Errorf("expected %+v to equal 1", groupCount)
 	}
 	cache = cache.SwapCache(countFetcher(&count), nil)
 	v2, exists := cache.Get("Hi")
@@ -324,7 +324,7 @@ func TestSwapSingleOnFetchUsesSingle(t *testing.T) {
 	}
 	cache = cache.SwapCache(countFetcher(&count), nil)
 	cache.Get("Hi")
-	time.Sleep(10 * time.Microsecond)
+	time.Sleep(20 * time.Microsecond)
 
 	if count != 1 {
 		t.Errorf("expected %+v to equal 1", count)

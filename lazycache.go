@@ -9,7 +9,7 @@ import (
 )
 
 type Fetcher func(id string) (interface{}, error)
-type GroupFetcher func() (*map[string]interface{}, error)
+type GroupFetcher func() (map[string]interface{}, error)
 
 type Item struct {
 	object  interface{}
@@ -102,7 +102,7 @@ func (cache *LazyCache) groupFetch(id string) (interface{}, bool) {
 	}
 
 	var res interface{}
-	for k, v := range *objects {
+	for k, v := range objects {
 		cache.Set(k, v)
 		if k == id {
 			res = v
