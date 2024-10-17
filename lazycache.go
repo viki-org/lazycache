@@ -9,6 +9,7 @@ import (
 )
 
 type Fetcher func(id string) (interface{}, error)
+type GroupFetcher func() (map[string]interface{}, error)
 
 type Item struct {
 	object  interface{}
@@ -16,32 +17,56 @@ type Item struct {
 }
 
 type LazyCache struct {
-	fetcher Fetcher
-	ttl     time.Duration
-	lock    sync.RWMutex
-	items   map[string]*Item
+	fetcher      Fetcher
+	groupFetcher GroupFetcher
+	ttl          time.Duration
+	lock         sync.RWMutex
+	items        map[string]*Item
 }
 
 func New(fetcher Fetcher, ttl time.Duration, size int) *LazyCache {
 	return &LazyCache{
-		ttl:     ttl,
-		fetcher: fetcher,
-		items:   make(map[string]*Item, size),
+		ttl:          ttl,
+		fetcher:      fetcher,
+		groupFetcher: nil,
+		items:        make(map[string]*Item, size),
 	}
+}
+
+func NewGroup(groupFetcher GroupFetcher, fetcher Fetcher, ttl time.Duration, size int) *LazyCache {
+	return &LazyCache{
+		ttl:          ttl,
+		fetcher:      fetcher,
+		groupFetcher: groupFetcher,
+		items:        make(map[string]*Item, size),
+	}
+}
+
+func (cache *LazyCache) SwapCache(fetcher Fetcher, groupFetcher GroupFetcher) *LazyCache {
+	cache.fetcher = fetcher
+	cache.groupFetcher = groupFetcher
+	return cache
 }
 
 func (cache *LazyCache) Get(id string) (interface{}, bool) {
 	cache.lock.RLock()
 	item, exists := cache.items[id]
-	if exists == false {
+	if !exists {
 		cache.lock.RUnlock()
+		if cache.groupFetcher != nil {
+			return cache.groupFetch(id)
+		}
 		return cache.Fetch(id)
 	}
 	expires := item.expires
 	object := item.object
 	cache.lock.RUnlock()
 	if time.Now().After(expires) {
-		go cache.Fetch(id)
+		if cache.groupFetcher != nil {
+			go cache.groupFetch(id)
+		} else {
+			go cache.Fetch(id)
+		}
 	}
 	return object, object != nil
 }
@@ -65,4 +90,23 @@ func (cache *LazyCache) Fetch(id string) (interface{}, bool) {
 	}
 	cache.Set(id, object)
 	return object, object != nil
+}
+
+func (cache *LazyCache) groupFetch(id string) (interface{}, bool) {
+	objects, err := cache.groupFetcher()
+	if err != nil || objects == nil {
+		if cache.fetcher == nil {
+			return nil, false
+		}
+		return cache.Fetch(id) // fallback to single fetch
+	}
+
+	var res interface{}
+	for k, v := range objects {
+		cache.Set(k, v)
+		if k == id {
+			res = v
+		}
+	}
+	return res, res != nil
 }
